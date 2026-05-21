@@ -50,7 +50,7 @@ export function useCurrentUser() {
 }
 
 export function useInitializeAuth() {
-  const { setUser, clearUser } = useAuthStore();
+  const { setUser, clearUser, setAccessToken } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -60,6 +60,9 @@ export function useInitializeAuth() {
       async (event, session) => {
         if (event === "SIGNED_OUT" || !session) {
           clearUser();
+        }
+        if (session?.access_token) {
+          setAccessToken(session.access_token);
         }
         if (event === "SIGNED_IN" && session) {
           try {
