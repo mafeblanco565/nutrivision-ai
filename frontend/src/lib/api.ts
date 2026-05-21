@@ -1,7 +1,11 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { createClient } from "@/lib/supabase/client";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
+    ? "https://backend-production-bdbf.up.railway.app/api/v1"
+    : "http://localhost:8000/api/v1");
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
