@@ -16,6 +16,15 @@ export const metadata: Metadata = {
   description: "Track your nutrition with AI-powered food detection",
   keywords: ["nutrition", "calories", "AI", "food tracking", "macros"],
   authors: [{ name: "NutriVision AI" }],
+  icons: {
+    // iOS Safari uses apple-touch-icon, not the PWA manifest
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
