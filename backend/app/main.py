@@ -51,7 +51,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", tags=["health"])
 async def health_check():
-    return {"status": "ok", "version": settings.APP_VERSION}
+    import os
+    gemini_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+    return {
+        "status": "ok",
+        "version": settings.APP_VERSION,
+        "vision": "gemini" if gemini_key else "mock",
+    }
 
 
 # Mount versioned API
