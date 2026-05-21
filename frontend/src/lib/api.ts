@@ -1,16 +1,9 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { createClient } from "@/lib/supabase/client";
 
-function resolveApiUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  if (typeof window === "undefined") return "https://backend-production-bdbf.up.railway.app/api/v1";
-  const local = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-  return local
-    ? "http://localhost:8000/api/v1"
-    : "https://backend-production-bdbf.up.railway.app/api/v1";
-}
-
-const API_URL = resolveApiUrl();
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://backend-production-bdbf.up.railway.app/api/v1";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
