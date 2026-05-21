@@ -57,13 +57,15 @@ class VisionProvider(ABC):
         pass
 
 
-VISION_PROMPT = """Analiza esta imagen de comida y devuelve un JSON con los alimentos detectados.
+VISION_PROMPT = """You are a nutrition expert analyzing a food photo. Look carefully at the actual image and identify exactly what you see.
 
-Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdown, sin texto extra):
+IMPORTANT: Describe only what is ACTUALLY visible in the image. Do not guess or assume.
+
+Return ONLY a valid JSON object (no markdown, no extra text):
 {
   "foods": [
     {
-      "name": "nombre del alimento en español",
+      "name": "nombre en español del alimento real visible",
       "quantity_g": 150,
       "calories": 247,
       "protein_g": 31.0,
@@ -75,20 +77,21 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdow
   ]
 }
 
-Instrucciones:
-- Detecta TODOS los alimentos visibles en el plato
-- Estima los gramos de cada alimento por su tamaño visual
-- Calcula las calorías y macros basándote en los gramos estimados
-- confidence: número entre 0 y 1 indicando qué tan seguro estás
-- Usa nombres de alimentos en español
-- Si no puedes identificar un alimento, nómbralo descriptivamente
+Rules:
+- Identify every distinct food item visible in the photo
+- Estimate grams based on portion size relative to the plate/container
+- Calculate calories and macros from standard nutritional data for those grams
+- confidence: 0.0-1.0 (how certain you are about this specific item)
+- Name foods in Spanish
+- If unsure about a specific food, describe it (e.g., "salsa roja", "vegetal verde")
+- A sandwich is "sandwich" or "sándwich", pizza is "pizza", burger is "hamburguesa"
 """
 
 
 class GeminiVisionProvider(VisionProvider):
-    """Google Gemini 1.5 Flash — gratuito, preciso para análisis de alimentos."""
+    """Google Gemini 2.0 Flash — mejor reconocimiento visual de alimentos."""
 
-    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -106,7 +109,7 @@ class GeminiVisionProvider(VisionProvider):
                         ]
                     }
                 ],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500},
             }
 
             async with httpx.AsyncClient(timeout=60.0) as client:
