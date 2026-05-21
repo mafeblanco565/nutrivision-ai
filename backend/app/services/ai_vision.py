@@ -9,6 +9,7 @@ Proveedores disponibles:
 import httpx
 import base64
 import json
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
@@ -199,8 +200,10 @@ class MockVisionProvider(VisionProvider):
 
 def get_vision_provider() -> VisionProvider:
     """Selecciona el proveedor según las API keys disponibles."""
-    if settings.GEMINI_API_KEY:
+    # Read directly from env to bypass lru_cache on settings
+    api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "").strip()
+    if api_key:
         logger.info("Usando Google Gemini 1.5 Flash Vision")
-        return GeminiVisionProvider(settings.GEMINI_API_KEY)
+        return GeminiVisionProvider(api_key)
     logger.warning("Sin API key — usando MockVisionProvider")
     return MockVisionProvider()
