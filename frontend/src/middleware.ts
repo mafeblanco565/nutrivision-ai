@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = ["/login", "/register", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/register", "/auth/callback"];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes and Next.js internals
   if (
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
@@ -16,16 +15,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for access token in cookies (set by the auth store on login)
-  const token = request.cookies.get("access_token")?.value;
+  const { supabaseResponse, user } = await updateSession(request);
 
-  if (!token) {
+  if (!user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {

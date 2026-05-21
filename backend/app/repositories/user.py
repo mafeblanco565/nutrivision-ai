@@ -11,7 +11,6 @@ class UserRepository(BaseRepository[User]):
         super().__init__(User, db)
 
     async def get_by_id(self, id: int) -> Optional[User]:
-        """Override base to eagerly load profile (required for async SQLAlchemy)."""
         result = await self.db.execute(
             select(User)
             .where(User.id == id)
@@ -23,6 +22,14 @@ class UserRepository(BaseRepository[User]):
         result = await self.db.execute(
             select(User)
             .where(User.email == email)
+            .options(selectinload(User.profile))
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_supabase_id(self, supabase_id: str) -> Optional[User]:
+        result = await self.db.execute(
+            select(User)
+            .where(User.supabase_id == supabase_id)
             .options(selectinload(User.profile))
         )
         return result.scalar_one_or_none()

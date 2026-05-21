@@ -37,3 +37,19 @@ def decode_token(token: str) -> Optional[dict]:
 
 def verify_token_type(payload: dict, token_type: str) -> bool:
     return payload.get("type") == token_type
+
+
+def verify_supabase_token(token: str) -> Optional[dict]:
+    """Verify a Supabase-issued JWT using the project JWT secret."""
+    if not settings.SUPABASE_JWT_SECRET:
+        return None
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
+        return payload
+    except JWTError:
+        return None

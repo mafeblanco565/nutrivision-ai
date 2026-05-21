@@ -1,52 +1,81 @@
 "use client";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/stores/auth";
 import { authService } from "@/services/auth.service";
 
-export function useLogin() {
-  const { setAuth } = useAuthStore();
-  const router = useRouter();
-
-  return useMutation({
-    mutationFn: authService.login,
-    onSuccess: (data) => {
-      setAuth(data.user, data.access_token, data.refresh_token);
-      router.push(data.user.has_profile ? "/dashboard" : "/onboarding");
-    },
-  });
-}
-
-export function useRegister() {
-  const { setAuth } = useAuthStore();
-  const router = useRouter();
-
-  return useMutation({
-    mutationFn: authService.register,
-    onSuccess: (data) => {
-      setAuth(data.user, data.access_token, data.refresh_token);
-      router.push("/onboarding");
-    },
-  });
+export function useSignInWithGoogle() {
+  const signIn = async () => {
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { access_type: "offline", prompt: "consent" },
+      },
+    });
+  };
+  return signIn;
 }
 
 export function useLogout() {
-  const { clearAuth } = useAuthStore();
+  const { clearUser } = useAuthStore();
   const router = useRouter();
 
-  return () => {
-    clearAuth();
+  return async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    clearUser();
     router.push("/login");
   };
 }
 
 export function useCurrentUser() {
-  const { isAuthenticated } = useAuthStore();
+  const { user, setUser } = useAuthStore();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["me"],
     queryFn: authService.getMe,
-    enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (query.data) setUser(query.data);
+  }, [query.data, setUser]);
+
+  return { ...query, user: query.data ?? user };
+}
+
+export function useInitializeAuth() {
+  const { setUser, clearUser } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_OUT" || !session) {
+          clearUser();
+        }
+        if (event === "SIGNED_IN" && session) {
+          try {
+            const userData = await authService.getMe();
+            setUser(userData);
+            if (!userData.has_profile) {
+              router.push("/onboarding");
+            }
+          } catch {
+            // Backend unreachable — keep session, user will retry
+          }
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

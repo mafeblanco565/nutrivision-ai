@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import async_session_factory
-from app.core.security import decode_token, verify_token_type
+from app.core.security import verify_supabase_token
 from app.repositories.user import UserRepository
 from app.models.user import User
 
@@ -32,21 +32,30 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = decode_token(credentials.credentials)
+    payload = verify_supabase_token(credentials.credentials)
     if not payload:
         raise credentials_exception
 
-    if not verify_token_type(payload, "access"):
-        raise credentials_exception
+    supabase_id: Optional[str] = payload.get("sub")
+    email: Optional[str] = payload.get("email")
 
-    user_id: Optional[str] = payload.get("sub")
-    if not user_id:
+    if not supabase_id or not email:
         raise credentials_exception
 
     user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(int(user_id))
+    user = await user_repo.get_by_supabase_id(supabase_id)
+
     if not user:
-        raise credentials_exception
+        # First login — auto-create user record
+        user = User(
+            supabase_id=supabase_id,
+            email=email,
+            is_active=True,
+            is_verified=True,
+        )
+        await user_repo.create(user)
+        # Reload with relationships eagerly loaded
+        user = await user_repo.get_by_supabase_id(supabase_id)
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")

@@ -55,6 +55,9 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",")]
         return v
 
+    # Supabase Auth
+    SUPABASE_JWT_SECRET: str = ""
+
     # OpenAI GPT-4o Vision
     OPENAI_API_KEY: Optional[str] = None
 

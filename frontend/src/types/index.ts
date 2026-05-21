@@ -98,13 +98,6 @@ export interface WeeklyProgress {
   days_on_target: number;
 }
 
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  user: User;
-}
-
 export interface AIAnalysisResponse {
   meal_entry_id: number;
   detected_foods: MealItem[];

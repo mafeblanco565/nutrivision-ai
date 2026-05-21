@@ -12,8 +12,9 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    supabase_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
