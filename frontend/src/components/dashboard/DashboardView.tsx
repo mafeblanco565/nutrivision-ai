@@ -7,6 +7,7 @@ import { WeeklyChart } from "@/components/charts/WeeklyChart";
 import { MealTimeline } from "@/components/meals/MealTimeline";
 import { RecommendationBanner } from "@/components/dashboard/RecommendationBanner";
 import { SkeletonCard } from "@/components/common/SkeletonCard";
+import { NutriVisionLogo } from "@/components/common/NutriVisionLogo";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -22,11 +23,17 @@ export function DashboardView() {
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Header */}
-      <div>
-        <p className="text-sm text-muted-foreground capitalize">{today}</p>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">
-          ¡Hola! 👋
-        </h1>
+      <div className="flex items-start justify-between">
+        <div>
+          {/* Logo visible only on mobile (desktop shows it in sidebar) */}
+          <div className="lg:hidden mb-3">
+            <NutriVisionLogo size="md" />
+          </div>
+          <p className="text-sm text-muted-foreground capitalize">{today}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">
+            ¡Hola! 👋
+          </h1>
+        </div>
       </div>
 
       {/* Recommendations */}

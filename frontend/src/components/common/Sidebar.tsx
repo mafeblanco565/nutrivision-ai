@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { useLogout } from "@/hooks/useAuth";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
+import { NutriVisionLogo } from "./NutriVisionLogo";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,16 +24,8 @@ export function Sidebar() {
   return (
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 border-r border-border z-30">
       {/* Brand */}
-      <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-brand flex items-center justify-center shadow-md">
-            <span className="text-xl">🥗</span>
-          </div>
-          <div>
-            <p className="font-bold text-gray-900 dark:text-white">NutriVision</p>
-            <p className="text-xs text-muted-foreground">AI</p>
-          </div>
-        </div>
+      <div className="p-5 border-b border-border">
+        <NutriVisionLogo size="sm" variant={theme === "dark" ? "light" : "dark"} />
       </div>
 
       {/* Navigation */}
