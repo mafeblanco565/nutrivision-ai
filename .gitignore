@@ -1,0 +1,60 @@
+# ============================================================
+# NutriVision AI — .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files — NEVER commit real secrets
+.env
+backend/.env
+frontend/.env.local
+# Allow example files
+!*.env.example
+!*.env.local.example
+
+# Node / Next.js
+node_modules/
+.next/
+.env.local
+.env.production
+out/
+npm-debug.log*
+frontend/.turbo/
+
+# DB
+*.db
+*.sqlite
+
+# Uploads / media
+backend/uploads/
+media/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker local config (has DNS settings, not needed in repo)
+docker-daemon-config.json

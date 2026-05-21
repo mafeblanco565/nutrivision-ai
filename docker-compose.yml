@@ -1,0 +1,85 @@
+﻿services:
+  # ============================================================
+  # PostgreSQL Database
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nutrivision_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nutrivision
+      POSTGRES_PASSWORD: nutrivision_pass
+      POSTGRES_DB: nutrivision_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutrivision -d nutrivision_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nutrivision_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nutrivision_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://nutrivision:nutrivision_pass@postgres:5432/nutrivision_db
+      DATABASE_URL_SYNC: postgresql://nutrivision:nutrivision_pass@postgres:5432/nutrivision_db
+      SECRET_KEY: ${SECRET_KEY:-nutrivision-secret-key-change-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-nutrivision-jwt-secret-change-in-production}
+      ALLOWED_ORIGINS: "http://localhost:3000"
+      LOGMEAL_API_TOKEN: ${LOGMEAL_API_TOKEN:-}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nutrivision_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: nutrivision_network
