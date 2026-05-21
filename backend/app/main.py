@@ -61,6 +61,21 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 @app.on_event("startup")
 async def startup_event():
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]")
+    import subprocess
+    try:
+        logger.info("Running database migrations...")
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            logger.error(f"Migration failed (exit {result.returncode}): {result.stderr}")
+        else:
+            logger.info(f"Migrations OK: {result.stdout.strip() or 'no new migrations'}")
+    except Exception as e:
+        logger.error(f"Migration error: {e}")
 
 
 @app.on_event("shutdown")
