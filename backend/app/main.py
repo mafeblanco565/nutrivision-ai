@@ -77,6 +77,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Migration error: {e}")
 
+    from app.core.security import refresh_supabase_jwks
+    if await refresh_supabase_jwks():
+        logger.info("Supabase JWKS loaded successfully")
+    else:
+        logger.warning("Could not load Supabase JWKS — check SUPABASE_URL env var")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

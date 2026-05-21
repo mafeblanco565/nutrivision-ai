@@ -1,9 +1,15 @@
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
+
 import bcrypt
+import httpx
 from jose import JWTError, jwt
+from jose import jwk as jose_jwk
+
 from app.core.config import settings
 
+# ── Legacy JWT helpers (kept for any internal tokens) ────────────────────────
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
@@ -27,29 +33,51 @@ def create_refresh_token(subject: Union[str, int]) -> str:
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_token(token: str) -> Optional[dict]:
+# ── Supabase JWKS verification (ECC P-256) ───────────────────────────────────
+
+_jwks_cache: dict = {"keys": [], "fetched_at": 0.0}
+_JWKS_TTL = 3600.0  # refresh every hour
+
+
+async def refresh_supabase_jwks() -> bool:
+    """Fetch JWKS from Supabase and cache them. Returns True on success."""
+    if not settings.SUPABASE_URL:
+        return False
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        return payload
-    except JWTError:
-        return None
-
-
-def verify_token_type(payload: dict, token_type: str) -> bool:
-    return payload.get("type") == token_type
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+            )
+            resp.raise_for_status()
+            keys = resp.json().get("keys", [])
+            _jwks_cache["keys"] = keys
+            _jwks_cache["fetched_at"] = time.time()
+            return bool(keys)
+    except Exception:
+        return False
 
 
 def verify_supabase_token(token: str) -> Optional[dict]:
-    """Verify a Supabase-issued JWT using the project JWT secret."""
-    if not settings.SUPABASE_JWT_SECRET:
+    """Verify a Supabase JWT using cached JWKS (ES256 or HS256)."""
+    keys = _jwks_cache.get("keys", [])
+    if not keys:
         return None
+
     try:
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-        return payload
+        header = jwt.get_unverified_header(token)
+        kid = header.get("kid")
+        alg = header.get("alg", "ES256")
+
+        for key_data in keys:
+            if key_data.get("kid") == kid:
+                public_key = jose_jwk.construct(key_data, algorithm=alg)
+                payload = jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=[alg],
+                    audience="authenticated",
+                )
+                return payload
+        return None
     except JWTError:
         return None

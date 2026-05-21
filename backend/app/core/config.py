@@ -56,7 +56,7 @@ class Settings(BaseSettings):
         return v
 
     # Supabase Auth
-    SUPABASE_JWT_SECRET: str = ""
+    SUPABASE_URL: str = ""
 
     # OpenAI GPT-4o Vision
     OPENAI_API_KEY: Optional[str] = None
