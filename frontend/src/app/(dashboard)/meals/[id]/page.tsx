@@ -3,6 +3,7 @@ import { MealDetailView } from "@/components/meals/MealDetailView";
 
 export const metadata: Metadata = { title: "Detalle de comida" };
 
-export default function MealDetailPage({ params }: { params: { id: string } }) {
-  return <MealDetailView mealId={Number(params.id)} />;
+export default async function MealDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <MealDetailView mealId={Number(id)} />;
 }
