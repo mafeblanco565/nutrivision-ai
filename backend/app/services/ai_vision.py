@@ -1,9 +1,9 @@
 """
-AI Vision Service — OpenAI GPT-4o Vision como proveedor principal.
+AI Vision Service — Google Gemini Flash como proveedor principal.
 Adapter pattern: swap de proveedor sin tocar endpoints.
 
 Proveedores disponibles:
-  - OpenAIVisionProvider  (GPT-4o, recomendado)
+  - GeminiVisionProvider  (gemini-1.5-flash, recomendado — gratuito)
   - MockVisionProvider    (datos simulados, sin API key)
 """
 import httpx
@@ -56,7 +56,7 @@ class VisionProvider(ABC):
         pass
 
 
-OPENAI_PROMPT = """Analiza esta imagen de comida y devuelve un JSON con los alimentos detectados.
+VISION_PROMPT = """Analiza esta imagen de comida y devuelve un JSON con los alimentos detectados.
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdown, sin texto extra):
 {
@@ -84,48 +84,43 @@ Instrucciones:
 """
 
 
-class OpenAIVisionProvider(VisionProvider):
-    """GPT-4o Vision — análisis de alimentos con IA avanzada."""
+class GeminiVisionProvider(VisionProvider):
+    """Google Gemini 1.5 Flash — gratuito, preciso para análisis de alimentos."""
 
-    API_URL = "https://api.openai.com/v1/chat/completions"
+    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
 
     async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
         try:
-            # Codificar imagen en base64
             image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-            data_url = f"data:{mime_type};base64,{image_b64}"
 
             payload = {
-                "model": "gpt-4o",
-                "max_tokens": 1000,
-                "messages": [
+                "contents": [
                     {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": OPENAI_PROMPT},
-                            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
-                        ],
+                        "parts": [
+                            {"text": VISION_PROMPT},
+                            {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+                        ]
                     }
                 ],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
             }
 
             async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(self.API_URL, headers=self.headers, json=payload)
+                response = await client.post(
+                    f"{self.API_URL}?key={self.api_key}",
+                    json=payload,
+                )
                 response.raise_for_status()
                 data = response.json()
 
-            raw_text = data["choices"][0]["message"]["content"].strip()
-            logger.debug(f"OpenAI Vision raw response: {raw_text}")
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            logger.debug(f"Gemini Vision raw response: {raw_text}")
 
             # Limpiar posible markdown code block
-            if raw_text.startswith("```"):
+            if "```" in raw_text:
                 raw_text = raw_text.split("```")[1]
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
@@ -134,19 +129,18 @@ class OpenAIVisionProvider(VisionProvider):
             return self._build_result(parsed, raw_text)
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"OpenAI API HTTP error: {e.response.status_code} — {e.response.text}")
-            return VisionAnalysisResult(error=f"OpenAI API error: {e.response.status_code}")
+            logger.error(f"Gemini API HTTP error: {e.response.status_code} — {e.response.text}")
+            return VisionAnalysisResult(error=f"Gemini API error: {e.response.status_code}")
         except json.JSONDecodeError as e:
-            logger.error(f"OpenAI response JSON parse error: {e}")
-            return VisionAnalysisResult(error="No se pudo parsear la respuesta de OpenAI")
+            logger.error(f"Gemini response JSON parse error: {e}")
+            return VisionAnalysisResult(error="No se pudo parsear la respuesta de Gemini")
         except Exception as e:
-            logger.error(f"OpenAI Vision unexpected error: {e}")
+            logger.error(f"Gemini Vision unexpected error: {e}")
             return VisionAnalysisResult(error=str(e))
 
     def _build_result(self, parsed: dict, raw: str) -> VisionAnalysisResult:
         result = VisionAnalysisResult(raw_response=raw)
         foods = []
-
         for item in parsed.get("foods", []):
             food = DetectedFood(
                 name=item.get("name", "Alimento desconocido"),
@@ -159,7 +153,6 @@ class OpenAIVisionProvider(VisionProvider):
                 confidence=float(item.get("confidence", 0.85)),
             )
             foods.append(food)
-
         result.foods = foods
         result.calculate_totals()
         return result
@@ -169,7 +162,7 @@ class MockVisionProvider(VisionProvider):
     """Proveedor de prueba — sin API key configurada."""
 
     async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
-        logger.warning("MockVisionProvider activo — agrega OPENAI_API_KEY en backend/.env para análisis real")
+        logger.warning("MockVisionProvider activo — agrega GEMINI_API_KEY en Railway para análisis real")
         result = VisionAnalysisResult()
         result.foods = [
             DetectedFood(
@@ -206,8 +199,8 @@ class MockVisionProvider(VisionProvider):
 
 def get_vision_provider() -> VisionProvider:
     """Selecciona el proveedor según las API keys disponibles."""
-    if settings.OPENAI_API_KEY:
-        logger.info("Usando OpenAI GPT-4o Vision")
-        return OpenAIVisionProvider(settings.OPENAI_API_KEY)
+    if settings.GEMINI_API_KEY:
+        logger.info("Usando Google Gemini 1.5 Flash Vision")
+        return GeminiVisionProvider(settings.GEMINI_API_KEY)
     logger.warning("Sin API key — usando MockVisionProvider")
     return MockVisionProvider()

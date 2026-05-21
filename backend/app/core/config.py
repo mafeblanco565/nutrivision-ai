@@ -58,7 +58,9 @@ class Settings(BaseSettings):
     # Supabase Auth
     SUPABASE_URL: str = ""
 
-    # OpenAI GPT-4o Vision
+    # Google Gemini Vision (reemplaza OpenAI)
+    GEMINI_API_KEY: Optional[str] = None
+    # OpenAI (legacy, no usado)
     OPENAI_API_KEY: Optional[str] = None
 
     # Redis
