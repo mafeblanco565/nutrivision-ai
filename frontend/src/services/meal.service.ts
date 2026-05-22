@@ -1,5 +1,8 @@
 import apiClient from "@/lib/api";
+import { format } from "date-fns";
 import type { MealEntry, AIAnalysisResponse, DailyMacros, WeeklyProgress } from "@/types";
+
+const localToday = () => format(new Date(), "yyyy-MM-dd");
 
 export const mealService = {
   async analyzeImage(
@@ -19,8 +22,7 @@ export const mealService = {
   },
 
   async getTodayMeals(): Promise<MealEntry[]> {
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await apiClient.get<MealEntry[]>("/meals/today", { params: { client_date: today } });
+    const { data } = await apiClient.get<MealEntry[]>("/meals/today", { params: { client_date: localToday() } });
     return data;
   },
 
@@ -56,8 +58,7 @@ export const mealService = {
   },
 
   async getTodayMacros(): Promise<DailyMacros> {
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await apiClient.get<DailyMacros>("/macros/today", { params: { client_date: today } });
+    const { data } = await apiClient.get<DailyMacros>("/macros/today", { params: { client_date: localToday() } });
     return data;
   },
 
