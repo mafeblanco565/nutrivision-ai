@@ -264,6 +264,68 @@ class MockVisionProvider(VisionProvider):
         return result
 
 
+NUTRITION_LOOKUP_PROMPT = """You are a nutrition database. Given a food name and weight in grams, return its macronutrients.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{"calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "fiber_g": 0}}
+
+Use standard nutritional data (USDA or similar). Round to 1 decimal place."""
+
+
+async def lookup_food_nutrition(food_name: str, quantity_g: float) -> dict:
+    """Use AI to estimate nutrition for a named food at given grams."""
+    prompt = f'{NUTRITION_LOOKUP_PROMPT}\n\nFood: "{food_name}", Amount: {quantity_g}g'
+
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip() or (settings.OPENROUTER_API_KEY or "")
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or (settings.GEMINI_API_KEY or "")
+
+    if openrouter_key:
+        headers = {
+            "Authorization": f"Bearer {openrouter_key}",
+            "HTTP-Referer": "https://nutrivision-ai.vercel.app",
+            "X-Title": "NutriVision AI",
+        }
+        for model in ["google/gemini-2.5-flash-lite", "google/gemini-2.5-flash"]:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 0.1},
+                        headers=headers,
+                    )
+                if response.status_code in (404, 429):
+                    continue
+                data = response.json()
+                if data.get("error") or not data.get("choices"):
+                    continue
+                raw = _clean_json(data["choices"][0]["message"]["content"])
+                return json.loads(raw)
+            except Exception as e:
+                logger.error(f"Nutrition lookup error ({model}): {e}")
+                continue
+
+    elif gemini_key:
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200},
+            }
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                    json=payload,
+                )
+            if response.status_code == 200:
+                data = response.json()
+                raw = _clean_json(data["candidates"][0]["content"]["parts"][0]["text"])
+                return json.loads(raw)
+        except Exception as e:
+            logger.error(f"Gemini nutrition lookup error: {e}")
+
+    # Fallback: return zeros
+    return {"calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "fiber_g": 0}
+
+
 def get_vision_provider() -> VisionProvider:
     """Prioridad: OpenRouter → Gemini → Mock."""
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip() or (settings.OPENROUTER_API_KEY or "")

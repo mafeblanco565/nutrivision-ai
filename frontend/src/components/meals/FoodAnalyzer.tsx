@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { format, parseISO, subDays, addDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { useAnalyzeOnly, useSaveMeal } from "@/hooks/useMeals";
+import { useAnalyzeOnly, useSaveMeal, useLookupFood } from "@/hooks/useMeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -116,6 +116,7 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
 
   const analyzeOnly = useAnalyzeOnly();
   const saveMeal = useSaveMeal();
+  const lookupFood = useLookupFood();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -484,37 +485,81 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
               {/* Add manual food */}
               {showAddForm ? (
                 <div className="rounded-xl border-2 border-dashed border-primary/40 p-4 space-y-3">
-                  <p className="text-sm font-medium">Agregar alimento manual</p>
-                  <Input
-                    placeholder="Nombre del alimento *"
-                    value={newFood.food_name}
-                    onChange={(e) => setNewFood((f) => ({ ...f, food_name: e.target.value }))}
-                    className="text-sm"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Gramos</label>
-                      <Input type="number" placeholder="100" value={newFood.quantity_g} onChange={(e) => setNewFood((f) => ({ ...f, quantity_g: e.target.value }))} className="text-sm" min={1} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Calorías</label>
-                      <Input type="number" placeholder="0" value={newFood.calories} onChange={(e) => setNewFood((f) => ({ ...f, calories: e.target.value }))} className="text-sm" min={0} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Proteína (g)</label>
-                      <Input type="number" placeholder="0" value={newFood.protein_g} onChange={(e) => setNewFood((f) => ({ ...f, protein_g: e.target.value }))} className="text-sm" min={0} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Carbohidratos (g)</label>
-                      <Input type="number" placeholder="0" value={newFood.carbs_g} onChange={(e) => setNewFood((f) => ({ ...f, carbs_g: e.target.value }))} className="text-sm" min={0} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Grasa (g)</label>
-                      <Input type="number" placeholder="0" value={newFood.fat_g} onChange={(e) => setNewFood((f) => ({ ...f, fat_g: e.target.value }))} className="text-sm" min={0} />
+                  <p className="text-sm font-medium">Agregar alimento</p>
+
+                  {/* Name + grams row */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nombre del alimento *"
+                      value={newFood.food_name}
+                      onChange={(e) => setNewFood((f) => ({ ...f, food_name: e.target.value }))}
+                      className="text-sm flex-1"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Input
+                        type="number"
+                        placeholder="100"
+                        value={newFood.quantity_g}
+                        onChange={(e) => setNewFood((f) => ({ ...f, quantity_g: e.target.value }))}
+                        className="text-sm w-20"
+                        min={1}
+                      />
+                      <span className="text-xs text-muted-foreground">g</span>
                     </div>
                   </div>
+
+                  {/* AI calculate button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
+                    disabled={!newFood.food_name.trim() || lookupFood.isPending}
+                    onClick={async () => {
+                      const result = await lookupFood.mutateAsync({
+                        foodName: newFood.food_name.trim(),
+                        quantityG: parseFloat(newFood.quantity_g) || 100,
+                      });
+                      setNewFood((f) => ({
+                        ...f,
+                        calories: String(result.calories),
+                        protein_g: String(result.protein_g),
+                        carbs_g: String(result.carbs_g),
+                        fat_g: String(result.fat_g),
+                      }));
+                    }}
+                  >
+                    {lookupFood.isPending
+                      ? <><Loader2 size={14} className="animate-spin" /> Calculando...</>
+                      : <><Camera size={14} /> Calcular macros con IA</>
+                    }
+                  </Button>
+
+                  {/* Macro preview (editable) — shown after AI fills them */}
+                  {newFood.calories !== "" && (
+                    <div className="grid grid-cols-4 gap-2 p-3 bg-brand-50 dark:bg-brand-900/20 rounded-xl text-center">
+                      <div>
+                        <p className="text-sm font-bold text-brand-700">{newFood.calories}</p>
+                        <p className="text-[10px] text-muted-foreground">kcal</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-blue-600">{newFood.protein_g}g</p>
+                        <p className="text-[10px] text-muted-foreground">Prot</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-amber-600">{newFood.carbs_g}g</p>
+                        <p className="text-[10px] text-muted-foreground">Carbs</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-red-500">{newFood.fat_g}g</p>
+                        <p className="text-[10px] text-muted-foreground">Grasa</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowAddForm(false)} className="flex-1">Cancelar</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setShowAddForm(false); setNewFood({ food_name: "", quantity_g: "100", calories: "", protein_g: "", carbs_g: "", fat_g: "" }); }} className="flex-1">
+                      Cancelar
+                    </Button>
                     <Button size="sm" onClick={handleAddManual} disabled={!newFood.food_name.trim()} className="flex-1">
                       <Plus size={14} className="mr-1" /> Agregar
                     </Button>

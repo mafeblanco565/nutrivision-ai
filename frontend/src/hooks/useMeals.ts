@@ -139,6 +139,13 @@ export function useDeleteMeal() {
   });
 }
 
+export function useLookupFood() {
+  return useMutation({
+    mutationFn: ({ foodName, quantityG }: { foodName: string; quantityG: number }) =>
+      mealService.lookupFood(foodName, quantityG),
+  });
+}
+
 export function useDeleteMealItem() {
   const queryClient = useQueryClient();
 

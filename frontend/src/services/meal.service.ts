@@ -45,6 +45,14 @@ export const mealService = {
     return data;
   },
 
+  async lookupFood(foodName: string, quantityG: number): Promise<{
+    food_name: string; quantity_g: number; calories: number;
+    protein_g: number; carbs_g: number; fat_g: number; fiber_g: number;
+  }> {
+    const { data } = await apiClient.post("/meals/lookup-food", { food_name: foodName, quantity_g: quantityG });
+    return data;
+  },
+
   async getTodayMeals(): Promise<MealEntry[]> {
     const { data } = await apiClient.get<MealEntry[]>("/meals/today", { params: { client_date: localToday() } });
     return data;

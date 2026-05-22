@@ -11,7 +11,7 @@ from app.schemas.meal import (
     MealEntryResponse, AIAnalysisResponse, MealItemUpdate, DailyMacrosResponse,
     AnalysisPreviewResponse, SaveMealRequest, FoodItemDraft, MealEntryUpdate,
 )
-from app.services.ai_vision import get_vision_provider
+from app.services.ai_vision import get_vision_provider, lookup_food_nutrition
 
 router = APIRouter(prefix="/meals", tags=["meals"])
 
@@ -106,6 +106,39 @@ async def analyze_meal_image(
         total_fat_g=analysis.total_fat_g,
         confidence=analysis.confidence,
         image_url=meal_entry.image_url,
+    )
+
+
+class FoodLookupRequest(BaseModel):
+    food_name: str
+    quantity_g: float = 100.0
+
+
+class FoodLookupResponse(BaseModel):
+    food_name: str
+    quantity_g: float
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    fiber_g: float
+
+
+@router.post("/lookup-food", response_model=FoodLookupResponse)
+async def lookup_food(
+    payload: FoodLookupRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Ask AI for nutritional values of a food by name and grams."""
+    result = await lookup_food_nutrition(payload.food_name, payload.quantity_g)
+    return FoodLookupResponse(
+        food_name=payload.food_name,
+        quantity_g=payload.quantity_g,
+        calories=result.get("calories", 0),
+        protein_g=result.get("protein_g", 0),
+        carbs_g=result.get("carbs_g", 0),
+        fat_g=result.get("fat_g", 0),
+        fiber_g=result.get("fiber_g", 0),
     )
 
 
