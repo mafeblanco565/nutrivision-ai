@@ -13,15 +13,17 @@ router = APIRouter(prefix="/macros", tags=["macros"])
 
 @router.get("/today", response_model=DailyMacrosResponse)
 async def get_today_macros(
+    client_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    today = date.fromisoformat(client_date) if client_date else date.today()
     repo = DailyMacrosRepository(db)
-    daily = await repo.get_by_user_and_date(current_user.id, date.today())
+    daily = await repo.get_by_user_and_date(current_user.id, today)
 
     profile = current_user.profile
     response = DailyMacrosResponse(
-        date=date.today(),
+        date=today,
         total_calories=daily.total_calories if daily else 0.0,
         total_protein_g=daily.total_protein_g if daily else 0.0,
         total_carbs_g=daily.total_carbs_g if daily else 0.0,

@@ -19,7 +19,8 @@ export const mealService = {
   },
 
   async getTodayMeals(): Promise<MealEntry[]> {
-    const { data } = await apiClient.get<MealEntry[]>("/meals/today");
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await apiClient.get<MealEntry[]>("/meals/today", { params: { client_date: today } });
     return data;
   },
 
@@ -55,7 +56,8 @@ export const mealService = {
   },
 
   async getTodayMacros(): Promise<DailyMacros> {
-    const { data } = await apiClient.get<DailyMacros>("/macros/today");
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await apiClient.get<DailyMacros>("/macros/today", { params: { client_date: today } });
     return data;
   },
 

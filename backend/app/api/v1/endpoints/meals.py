@@ -112,11 +112,13 @@ async def analyze_meal_image(
 
 @router.get("/today", response_model=List[MealEntryResponse])
 async def get_today_meals(
+    client_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    today = date.fromisoformat(client_date) if client_date else date.today()
     repo = MealRepository(db)
-    meals = await repo.get_by_user_and_date(current_user.id, date.today())
+    meals = await repo.get_by_user_and_date(current_user.id, today)
     return meals
 
 
