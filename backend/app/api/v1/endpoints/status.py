@@ -1,4 +1,5 @@
 import os
+from datetime import date, datetime, timezone
 from fastapi import APIRouter
 from app.core.config import settings
 
@@ -21,5 +22,7 @@ def get_status():
         "vision_provider": provider,
         "openrouter_configured": bool(openrouter_key),
         "gemini_configured": bool(gemini_key),
-        "code_version": "openrouter-nemotron",
+        "server_date_utc": str(date.today()),
+        "server_utc_now": datetime.now(timezone.utc).isoformat(),
+        "code_version": "tz-fix-v2",
     }
