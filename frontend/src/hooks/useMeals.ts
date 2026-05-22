@@ -66,9 +66,11 @@ export function useAnalyzeMeal() {
       date: string;
     }) => mealService.analyzeImage(file, mealType, date),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MEAL_KEYS.today });
-      queryClient.invalidateQueries({ queryKey: MEAL_KEYS.todayMacros });
-      queryClient.invalidateQueries({ queryKey: MEAL_KEYS.recommendations });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: MEAL_KEYS.today });
+        queryClient.invalidateQueries({ queryKey: MEAL_KEYS.todayMacros });
+        queryClient.invalidateQueries({ queryKey: MEAL_KEYS.recommendations });
+      }, 800);
     },
   });
 }
