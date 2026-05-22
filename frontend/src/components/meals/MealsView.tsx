@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, parseISO, subDays, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { useSearchParams, useRouter } from "next/navigation";
 import { FoodAnalyzer } from "@/components/meals/FoodAnalyzer";
 import { MealTimeline } from "@/components/meals/MealTimeline";
 import { WeekStrip } from "@/components/meals/WeekStrip";
@@ -12,8 +13,18 @@ import { Button } from "@/components/ui/button";
 const localToday = () => format(new Date(), "yyyy-MM-dd");
 
 export function MealsView() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [showAnalyzer, setShowAnalyzer] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(localToday());
+
+  // Open FoodAnalyzer when navigated with ?add=true (from the + FAB)
+  useEffect(() => {
+    if (searchParams.get("add") === "true") {
+      setShowAnalyzer(true);
+      router.replace("/meals"); // clean URL without reloading
+    }
+  }, [searchParams, router]);
 
   const isToday = selectedDate === localToday();
   const todayQuery = useTodayMeals();
