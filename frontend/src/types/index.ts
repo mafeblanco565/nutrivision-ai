@@ -109,6 +109,36 @@ export interface AIAnalysisResponse {
   image_url: string | null;
 }
 
+export interface FoodItemDraft {
+  food_name: string;
+  quantity_g: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  confidence: number;
+  is_manual: boolean;
+}
+
+export interface AnalysisPreviewResponse {
+  detected_foods: FoodItemDraft[];
+  total_calories: number;
+  total_protein_g: number;
+  total_carbs_g: number;
+  total_fat_g: number;
+  confidence: number;
+  raw_response: string | null;
+}
+
+export interface SaveMealRequest {
+  meal_type: MealType;
+  eaten_at: string;
+  items: FoodItemDraft[];
+  ai_raw_response?: string | null;
+  ai_confidence?: number | null;
+}
+
 export interface MacroRing {
   label: string;
   consumed: number;

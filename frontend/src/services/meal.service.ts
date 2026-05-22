@@ -1,6 +1,6 @@
 import apiClient from "@/lib/api";
 import { format } from "date-fns";
-import type { MealEntry, AIAnalysisResponse, DailyMacros, WeeklyProgress } from "@/types";
+import type { MealEntry, AIAnalysisResponse, DailyMacros, WeeklyProgress, AnalysisPreviewResponse, SaveMealRequest, FoodItemDraft } from "@/types";
 
 const localToday = () => format(new Date(), "yyyy-MM-dd");
 
@@ -18,6 +18,30 @@ export const mealService = {
     const { data } = await apiClient.post<AIAnalysisResponse>("/meals/analyze", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    return data;
+  },
+
+  async analyzeImageOnly(imageFile: File): Promise<AnalysisPreviewResponse> {
+    const form = new FormData();
+    form.append("image", imageFile);
+    const { data } = await apiClient.post<AnalysisPreviewResponse>("/meals/analyze-only", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+
+  async saveMeal(request: SaveMealRequest): Promise<MealEntry> {
+    const { data } = await apiClient.post<MealEntry>("/meals", request);
+    return data;
+  },
+
+  async addMealItem(mealId: number, item: FoodItemDraft): Promise<MealEntry> {
+    const { data } = await apiClient.post<MealEntry>(`/meals/${mealId}/items`, item);
+    return data;
+  },
+
+  async getMacrosByDate(dateStr: string): Promise<DailyMacros> {
+    const { data } = await apiClient.get<DailyMacros>(`/macros/date/${dateStr}`);
     return data;
   },
 

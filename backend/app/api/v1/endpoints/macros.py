@@ -97,6 +97,37 @@ async def get_weekly_progress(
     )
 
 
+@router.get("/date/{target_date}", response_model=DailyMacrosResponse)
+async def get_macros_by_date(
+    target_date: date,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = DailyMacrosRepository(db)
+    daily = await repo.get_by_user_and_date(current_user.id, target_date)
+
+    profile = current_user.profile
+    response = DailyMacrosResponse(
+        date=target_date,
+        total_calories=daily.total_calories if daily else 0.0,
+        total_protein_g=daily.total_protein_g if daily else 0.0,
+        total_carbs_g=daily.total_carbs_g if daily else 0.0,
+        total_fat_g=daily.total_fat_g if daily else 0.0,
+        total_fiber_g=daily.total_fiber_g if daily else 0.0,
+        meal_count=daily.meal_count if daily else 0,
+    )
+
+    if profile:
+        response.target_calories = profile.target_calories
+        response.target_protein_g = profile.target_protein_g
+        response.target_carbs_g = profile.target_carbs_g
+        response.target_fat_g = profile.target_fat_g
+        response.calories_remaining = (profile.target_calories or 0) - response.total_calories
+        response.protein_remaining = (profile.target_protein_g or 0) - response.total_protein_g
+
+    return response
+
+
 @router.get("/recommendations")
 async def get_recommendations(
     current_user: User = Depends(get_current_user),
