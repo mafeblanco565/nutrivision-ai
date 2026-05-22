@@ -9,7 +9,7 @@ import { useAnalyzeMeal, useUpdateMealItem } from "@/hooks/useMeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MealType } from "@/types";
+import type { MealType, AIAnalysisResponse } from "@/types";
 
 interface FoodAnalyzerProps {
   onClose: () => void;
@@ -32,6 +32,7 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AIAnalysisResponse | null>(null);
 
   const analyze = useAnalyzeMeal();
   const updateItem = useUpdateMealItem();
@@ -55,11 +56,12 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
     setErrorMsg(null);
     setStep("analyzing");
     try {
-      await analyze.mutateAsync({
+      const data = await analyze.mutateAsync({
         file: selectedFile,
         mealType,
         date: format(new Date(), "yyyy-MM-dd"),
       });
+      setAnalysisResult(data);
       setStep("result");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } }; code?: string };
@@ -73,7 +75,7 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
     }
   };
 
-  const result = analyze.data;
+  const result = analysisResult;
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -243,7 +245,7 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
                 <Button variant="outline" onClick={onClose} className="flex-1">
                   Ver en timeline
                 </Button>
-                <Button onClick={() => { setStep("upload"); setPreview(null); setSelectedFile(null); }} variant="outline">
+                <Button onClick={() => { setStep("upload"); setPreview(null); setSelectedFile(null); setAnalysisResult(null); }} variant="outline">
                   Nueva foto
                 </Button>
               </div>
