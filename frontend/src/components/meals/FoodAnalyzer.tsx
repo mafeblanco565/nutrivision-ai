@@ -62,11 +62,12 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
       });
       setStep("result");
     } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } }; code?: string };
       const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        (err as { code?: string })?.code === "ECONNABORTED"
+        axiosErr?.response?.data?.detail ||
+        (axiosErr?.code === "ECONNABORTED"
           ? "El análisis tardó demasiado. Intenta con una imagen más pequeña."
-          : "No se pudo analizar la imagen. Intenta de nuevo.";
+          : "No se pudo analizar la imagen. Intenta de nuevo.");
       setErrorMsg(msg);
       setStep("upload");
     }
