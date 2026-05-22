@@ -10,6 +10,7 @@ import httpx
 import base64
 import json
 import os
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
@@ -97,50 +98,58 @@ class GeminiVisionProvider(VisionProvider):
         self.api_key = api_key
 
     async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
-        try:
-            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": VISION_PROMPT},
+                        {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+                    ]
+                }
+            ],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500},
+        }
 
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": VISION_PROMPT},
-                            {"inline_data": {"mime_type": mime_type, "data": image_b64}},
-                        ]
-                    }
-                ],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500},
-            }
+        last_error: Optional[str] = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f"{self.API_URL}?key={self.api_key}",
+                        json=payload,
+                    )
+                    if response.status_code == 429:
+                        wait = 5 * (attempt + 1)
+                        logger.warning(f"Gemini 429 rate limit — retrying in {wait}s (attempt {attempt + 1}/3)")
+                        await asyncio.sleep(wait)
+                        last_error = "Gemini rate limit (429)"
+                        continue
+                    response.raise_for_status()
+                    data = response.json()
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.API_URL}?key={self.api_key}",
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                logger.debug(f"Gemini Vision raw response: {raw_text}")
 
-            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            logger.debug(f"Gemini Vision raw response: {raw_text}")
+                if "```" in raw_text:
+                    raw_text = raw_text.split("```")[1]
+                    if raw_text.startswith("json"):
+                        raw_text = raw_text[4:]
 
-            # Limpiar posible markdown code block
-            if "```" in raw_text:
-                raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
+                parsed = json.loads(raw_text)
+                return self._build_result(parsed, raw_text)
 
-            parsed = json.loads(raw_text)
-            return self._build_result(parsed, raw_text)
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Gemini API HTTP error: {e.response.status_code} — {e.response.text}")
+                return VisionAnalysisResult(error=f"Gemini API error: {e.response.status_code}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Gemini response JSON parse error: {e}")
+                return VisionAnalysisResult(error="No se pudo parsear la respuesta de Gemini")
+            except Exception as e:
+                logger.error(f"Gemini Vision unexpected error: {e}")
+                return VisionAnalysisResult(error=str(e))
 
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Gemini API HTTP error: {e.response.status_code} — {e.response.text}")
-            return VisionAnalysisResult(error=f"Gemini API error: {e.response.status_code}")
-        except json.JSONDecodeError as e:
-            logger.error(f"Gemini response JSON parse error: {e}")
-            return VisionAnalysisResult(error="No se pudo parsear la respuesta de Gemini")
-        except Exception as e:
-            logger.error(f"Gemini Vision unexpected error: {e}")
-            return VisionAnalysisResult(error=str(e))
+        return VisionAnalysisResult(error=last_error or "Gemini no disponible. Intenta en unos segundos.")
 
     def _build_result(self, parsed: dict, raw: str) -> VisionAnalysisResult:
         result = VisionAnalysisResult(raw_response=raw)
