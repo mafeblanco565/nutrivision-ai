@@ -121,53 +121,66 @@ class OpenRouterVisionProvider(VisionProvider):
     """Llama 3.2 Vision via OpenRouter — gratis sin tarjeta de crédito."""
 
     API_URL = "https://openrouter.ai/api/v1/chat/completions"
-    MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
+    MODELS = [
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+        "google/gemma-4-26b-a4b-it:free",
+    ]
 
     def __init__(self, api_key: str):
         self.api_key = api_key
 
     async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-        payload = {
-            "model": self.MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": VISION_PROMPT},
-                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}"}},
-                    ],
-                }
-            ],
-            "max_tokens": 1500,
-            "temperature": 0.2,
-        }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "HTTP-Referer": "https://nutrivision-ai.vercel.app",
             "X-Title": "NutriVision AI",
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(self.API_URL, json=payload, headers=headers)
-                response.raise_for_status()
-                data = response.json()
+        for model in self.MODELS:
+            payload = {
+                "model": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": VISION_PROMPT},
+                            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}"}},
+                        ],
+                    }
+                ],
+                "max_tokens": 1500,
+                "temperature": 0.2,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(self.API_URL, json=payload, headers=headers)
+                    if response.status_code == 404:
+                        logger.warning(f"OpenRouter model {model} not found, trying next")
+                        continue
+                    if response.status_code == 429:
+                        logger.warning(f"OpenRouter model {model} rate limited, trying next")
+                        continue
+                    response.raise_for_status()
+                    data = response.json()
 
-            raw_text = _clean_json(data["choices"][0]["message"]["content"])
-            logger.debug(f"OpenRouter Vision raw response: {raw_text}")
-            parsed = json.loads(raw_text)
-            return _build_result_from_parsed(parsed, raw_text)
+                raw_text = _clean_json(data["choices"][0]["message"]["content"])
+                logger.info(f"OpenRouter Vision OK with model {model}")
+                parsed = json.loads(raw_text)
+                return _build_result_from_parsed(parsed, raw_text)
 
-        except httpx.HTTPStatusError as e:
-            logger.error(f"OpenRouter HTTP error: {e.response.status_code} — {e.response.text}")
-            return VisionAnalysisResult(error=f"OpenRouter error: {e.response.status_code}")
-        except json.JSONDecodeError as e:
-            logger.error(f"OpenRouter JSON parse error: {e}")
-            return VisionAnalysisResult(error="No se pudo parsear la respuesta de OpenRouter")
-        except Exception as e:
-            logger.error(f"OpenRouter unexpected error: {e}")
-            return VisionAnalysisResult(error=str(e))
+            except json.JSONDecodeError as e:
+                logger.error(f"OpenRouter JSON parse error ({model}): {e}")
+                return VisionAnalysisResult(error="No se pudo parsear la respuesta")
+            except httpx.HTTPStatusError as e:
+                logger.error(f"OpenRouter HTTP error ({model}): {e.response.status_code}")
+                continue
+            except Exception as e:
+                logger.error(f"OpenRouter unexpected error ({model}): {e}")
+                return VisionAnalysisResult(error=str(e))
+
+        return VisionAnalysisResult(error="Ningún modelo de OpenRouter disponible. Intenta más tarde.")
 
 
 class GeminiVisionProvider(VisionProvider):
