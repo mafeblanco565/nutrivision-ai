@@ -165,7 +165,17 @@ class OpenRouterVisionProvider(VisionProvider):
                     response.raise_for_status()
                     data = response.json()
 
-                raw_text = _clean_json(data["choices"][0]["message"]["content"])
+                if data.get("error"):
+                    err_msg = data["error"].get("message", str(data["error"]))
+                    logger.error(f"OpenRouter error body ({model}): {err_msg}")
+                    continue
+
+                choices = data.get("choices", [])
+                if not choices:
+                    logger.error(f"OpenRouter empty choices ({model}): {data}")
+                    continue
+
+                raw_text = _clean_json(choices[0]["message"]["content"])
                 logger.info(f"OpenRouter Vision OK with model {model}")
                 parsed = json.loads(raw_text)
                 return _build_result_from_parsed(parsed, raw_text)
