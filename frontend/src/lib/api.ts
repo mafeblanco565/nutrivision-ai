@@ -9,7 +9,7 @@ const API_URL =
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 30000,
+  timeout: 90000,
 });
 
 // Attach Supabase access token on every request

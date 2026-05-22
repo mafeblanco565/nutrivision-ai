@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Upload, X, Loader2, CheckCircle, Edit2, Trash2 } from "lucide-react";
+import { Camera, Upload, X, Loader2, CheckCircle, Edit2, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useAnalyzeMeal, useUpdateMealItem } from "@/hooks/useMeals";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const analyze = useAnalyzeMeal();
   const updateItem = useUpdateMealItem();
@@ -51,6 +52,7 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
 
   const handleAnalyze = async () => {
     if (!selectedFile) return;
+    setErrorMsg(null);
     setStep("analyzing");
     try {
       await analyze.mutateAsync({
@@ -59,7 +61,13 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
         date: format(new Date(), "yyyy-MM-dd"),
       });
       setStep("result");
-    } catch {
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        (err as { code?: string })?.code === "ECONNABORTED"
+          ? "El análisis tardó demasiado. Intenta con una imagen más pequeña."
+          : "No se pudo analizar la imagen. Intenta de nuevo.";
+      setErrorMsg(msg);
       setStep("upload");
     }
   };
@@ -96,6 +104,13 @@ export function FoodAnalyzer({ onClose }: FoodAnalyzerProps) {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
+              {/* Error banner */}
+              {errorMsg && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
               {/* Dropzone */}
               <div
                 {...getRootProps()}
