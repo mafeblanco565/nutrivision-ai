@@ -50,13 +50,17 @@ export function MealsView() {
         </div>
         <Button onClick={() => setShowAnalyzer(true)} className="gap-2">
           <Camera size={16} />
-          Analizar
+          Agregar
         </Button>
       </div>
 
       {/* Analyzer panel */}
       {showAnalyzer && (
-        <FoodAnalyzer onClose={() => setShowAnalyzer(false)} onSaved={handleSaved} />
+        <FoodAnalyzer
+          onClose={() => setShowAnalyzer(false)}
+          onSaved={handleSaved}
+          initialDate={selectedDate}
+        />
       )}
 
       {/* Week strip */}

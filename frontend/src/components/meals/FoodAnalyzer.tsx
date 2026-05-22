@@ -18,6 +18,7 @@ import type { MealType, AnalysisPreviewResponse } from "@/types";
 interface FoodAnalyzerProps {
   onClose: () => void;
   onSaved?: () => void;
+  initialDate?: string;
 }
 
 const MEAL_TYPE_OPTIONS: { value: MealType; label: string; emoji: string }[] = [
@@ -92,13 +93,13 @@ type Step = "upload" | "analyzing" | "review" | "saving" | "saved";
 
 const localToday = () => format(new Date(), "yyyy-MM-dd");
 
-export function FoodAnalyzer({ onClose, onSaved }: FoodAnalyzerProps) {
+export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProps) {
   const uid = useId();
   const [step, setStep] = useState<Step>("upload");
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [mealType, setMealType] = useState<MealType>("lunch");
-  const [eatenAt, setEatenAt] = useState<string>(localToday());
+  const [eatenAt, setEatenAt] = useState<string>(initialDate ?? localToday());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
@@ -335,6 +336,22 @@ export function FoodAnalyzer({ onClose, onSaved }: FoodAnalyzerProps) {
                 <Camera size={18} />
                 Analizar con IA
               </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white dark:bg-gray-900 px-2 text-muted-foreground">o</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setDraftItems([]); setShowAddForm(true); setStep("review"); }}
+                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm text-muted-foreground hover:text-foreground transition-all"
+              >
+                <Plus size={16} /> Agregar comida por nombre
+              </button>
             </motion.div>
           )}
 
