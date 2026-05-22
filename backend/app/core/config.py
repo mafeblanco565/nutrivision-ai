@@ -58,10 +58,10 @@ class Settings(BaseSettings):
     # Supabase Auth
     SUPABASE_URL: str = ""
 
-    # Google Gemini Vision (reemplaza OpenAI)
-    GEMINI_API_KEY: Optional[str] = None
-    # OpenAI (legacy, no usado)
-    OPENAI_API_KEY: Optional[str] = None
+    # Vision AI providers
+    OPENROUTER_API_KEY: Optional[str] = None  # prioridad 1 — gratis
+    GEMINI_API_KEY: Optional[str] = None       # prioridad 2 — gratis con cuota diaria
+    OPENAI_API_KEY: Optional[str] = None       # legacy, no usado
 
     # Redis
     REDIS_URL: Optional[str] = None

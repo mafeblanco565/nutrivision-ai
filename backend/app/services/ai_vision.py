@@ -1,10 +1,10 @@
 """
-AI Vision Service — Google Gemini Flash como proveedor principal.
-Adapter pattern: swap de proveedor sin tocar endpoints.
+AI Vision Service — multi-provider con fallback automático.
 
-Proveedores disponibles:
-  - GeminiVisionProvider  (gemini-1.5-flash, recomendado — gratuito)
-  - MockVisionProvider    (datos simulados, sin API key)
+Proveedor activo según keys disponibles (en orden de prioridad):
+  1. OpenRouterVisionProvider  (Llama 3.2 Vision — gratis, openrouter.ai)
+  2. GeminiVisionProvider      (gemini-1.5-flash — gratis con cuota diaria)
+  3. MockVisionProvider        (datos simulados, sin API key)
 """
 import httpx
 import base64
@@ -89,8 +89,89 @@ Rules:
 """
 
 
+def _build_result_from_parsed(parsed: dict, raw: str) -> VisionAnalysisResult:
+    result = VisionAnalysisResult(raw_response=raw)
+    foods = []
+    for item in parsed.get("foods", []):
+        food = DetectedFood(
+            name=item.get("name", "Alimento desconocido"),
+            quantity_g=float(item.get("quantity_g", 100)),
+            calories=float(item.get("calories", 0)),
+            protein_g=float(item.get("protein_g", 0)),
+            carbs_g=float(item.get("carbs_g", 0)),
+            fat_g=float(item.get("fat_g", 0)),
+            fiber_g=float(item.get("fiber_g", 0)),
+            confidence=float(item.get("confidence", 0.85)),
+        )
+        foods.append(food)
+    result.foods = foods
+    result.calculate_totals()
+    return result
+
+
+def _clean_json(raw_text: str) -> str:
+    if "```" in raw_text:
+        raw_text = raw_text.split("```")[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+    return raw_text.strip()
+
+
+class OpenRouterVisionProvider(VisionProvider):
+    """Llama 3.2 Vision via OpenRouter — gratis sin tarjeta de crédito."""
+
+    API_URL = "https://openrouter.ai/api/v1/chat/completions"
+    MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        payload = {
+            "model": self.MODEL,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": VISION_PROMPT},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}"}},
+                    ],
+                }
+            ],
+            "max_tokens": 1500,
+            "temperature": 0.2,
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "HTTP-Referer": "https://nutrivision-ai.vercel.app",
+            "X-Title": "NutriVision AI",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(self.API_URL, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+
+            raw_text = _clean_json(data["choices"][0]["message"]["content"])
+            logger.debug(f"OpenRouter Vision raw response: {raw_text}")
+            parsed = json.loads(raw_text)
+            return _build_result_from_parsed(parsed, raw_text)
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter HTTP error: {e.response.status_code} — {e.response.text}")
+            return VisionAnalysisResult(error=f"OpenRouter error: {e.response.status_code}")
+        except json.JSONDecodeError as e:
+            logger.error(f"OpenRouter JSON parse error: {e}")
+            return VisionAnalysisResult(error="No se pudo parsear la respuesta de OpenRouter")
+        except Exception as e:
+            logger.error(f"OpenRouter unexpected error: {e}")
+            return VisionAnalysisResult(error=str(e))
+
+
 class GeminiVisionProvider(VisionProvider):
-    """Google Gemini 2.0 Flash — mejor reconocimiento visual de alimentos."""
+    """Google Gemini 1.5 Flash — gratis con cuota diaria."""
 
     API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
@@ -121,101 +202,57 @@ class GeminiVisionProvider(VisionProvider):
                     )
                     if response.status_code == 429:
                         wait = 5 * (attempt + 1)
-                        logger.warning(f"Gemini 429 rate limit — retrying in {wait}s (attempt {attempt + 1}/3)")
+                        logger.warning(f"Gemini 429 — retrying in {wait}s (attempt {attempt + 1}/3)")
                         await asyncio.sleep(wait)
                         last_error = "Gemini rate limit (429)"
                         continue
                     response.raise_for_status()
                     data = response.json()
 
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                raw_text = _clean_json(data["candidates"][0]["content"]["parts"][0]["text"])
                 logger.debug(f"Gemini Vision raw response: {raw_text}")
-
-                if "```" in raw_text:
-                    raw_text = raw_text.split("```")[1]
-                    if raw_text.startswith("json"):
-                        raw_text = raw_text[4:]
-
                 parsed = json.loads(raw_text)
-                return self._build_result(parsed, raw_text)
+                return _build_result_from_parsed(parsed, raw_text)
 
             except httpx.HTTPStatusError as e:
-                logger.error(f"Gemini API HTTP error: {e.response.status_code} — {e.response.text}")
+                logger.error(f"Gemini HTTP error: {e.response.status_code} — {e.response.text}")
                 return VisionAnalysisResult(error=f"Gemini API error: {e.response.status_code}")
             except json.JSONDecodeError as e:
-                logger.error(f"Gemini response JSON parse error: {e}")
+                logger.error(f"Gemini JSON parse error: {e}")
                 return VisionAnalysisResult(error="No se pudo parsear la respuesta de Gemini")
             except Exception as e:
-                logger.error(f"Gemini Vision unexpected error: {e}")
+                logger.error(f"Gemini unexpected error: {e}")
                 return VisionAnalysisResult(error=str(e))
 
         return VisionAnalysisResult(error=last_error or "Gemini no disponible. Intenta en unos segundos.")
-
-    def _build_result(self, parsed: dict, raw: str) -> VisionAnalysisResult:
-        result = VisionAnalysisResult(raw_response=raw)
-        foods = []
-        for item in parsed.get("foods", []):
-            food = DetectedFood(
-                name=item.get("name", "Alimento desconocido"),
-                quantity_g=float(item.get("quantity_g", 100)),
-                calories=float(item.get("calories", 0)),
-                protein_g=float(item.get("protein_g", 0)),
-                carbs_g=float(item.get("carbs_g", 0)),
-                fat_g=float(item.get("fat_g", 0)),
-                fiber_g=float(item.get("fiber_g", 0)),
-                confidence=float(item.get("confidence", 0.85)),
-            )
-            foods.append(food)
-        result.foods = foods
-        result.calculate_totals()
-        return result
 
 
 class MockVisionProvider(VisionProvider):
     """Proveedor de prueba — sin API key configurada."""
 
     async def analyze_image(self, image_bytes: bytes, mime_type: str) -> VisionAnalysisResult:
-        logger.warning("MockVisionProvider activo — agrega GEMINI_API_KEY en Railway para análisis real")
+        logger.warning("MockVisionProvider activo — configura OPENROUTER_API_KEY o GEMINI_API_KEY en Railway")
         result = VisionAnalysisResult()
         result.foods = [
-            DetectedFood(
-                name="Pollo a la plancha",
-                quantity_g=150,
-                calories=247,
-                protein_g=46.5,
-                carbs_g=0,
-                fat_g=5.5,
-                confidence=0.91,
-            ),
-            DetectedFood(
-                name="Arroz blanco",
-                quantity_g=100,
-                calories=130,
-                protein_g=2.7,
-                carbs_g=28.2,
-                fat_g=0.3,
-                confidence=0.87,
-            ),
-            DetectedFood(
-                name="Ensalada mixta",
-                quantity_g=80,
-                calories=24,
-                protein_g=1.8,
-                carbs_g=4.0,
-                fat_g=0.2,
-                confidence=0.78,
-            ),
+            DetectedFood(name="Pollo a la plancha", quantity_g=150, calories=247, protein_g=46.5, carbs_g=0, fat_g=5.5, confidence=0.91),
+            DetectedFood(name="Arroz blanco", quantity_g=100, calories=130, protein_g=2.7, carbs_g=28.2, fat_g=0.3, confidence=0.87),
+            DetectedFood(name="Ensalada mixta", quantity_g=80, calories=24, protein_g=1.8, carbs_g=4.0, fat_g=0.2, confidence=0.78),
         ]
         result.calculate_totals()
         return result
 
 
 def get_vision_provider() -> VisionProvider:
-    """Selecciona el proveedor según las API keys disponibles."""
-    # Read directly from env to bypass lru_cache on settings
-    api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "").strip()
-    if api_key:
+    """Prioridad: OpenRouter → Gemini → Mock."""
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip() or (settings.OPENROUTER_API_KEY or "")
+    if openrouter_key:
+        logger.info("Usando OpenRouter (Llama 3.2 Vision) — gratis")
+        return OpenRouterVisionProvider(openrouter_key)
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or (settings.GEMINI_API_KEY or "")
+    if gemini_key:
         logger.info("Usando Google Gemini 1.5 Flash Vision")
-        return GeminiVisionProvider(api_key)
+        return GeminiVisionProvider(gemini_key)
+
     logger.warning("Sin API key — usando MockVisionProvider")
     return MockVisionProvider()
