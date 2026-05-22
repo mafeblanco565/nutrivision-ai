@@ -96,6 +96,8 @@ async def analyze_meal_image(
     daily_repo = DailyMacrosRepository(db)
     await daily_repo.upsert_daily(current_user.id, meal_date, db)
 
+    await db.commit()
+
     return AIAnalysisResponse(
         meal_entry_id=meal_entry.id,
         detected_foods=items,
