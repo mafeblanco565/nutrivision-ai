@@ -264,17 +264,14 @@ class MockVisionProvider(VisionProvider):
         return result
 
 
-NUTRITION_LOOKUP_PROMPT = """You are a nutrition database. Given a food name and weight in grams, return its macronutrients.
-
-Return ONLY valid JSON (no markdown, no explanation):
-{{"calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "fiber_g": 0}}
-
-Use standard nutritional data (USDA or similar). Round to 1 decimal place."""
-
-
-async def lookup_food_nutrition(food_name: str, quantity_g: float) -> dict:
-    """Use AI to estimate nutrition for a named food at given grams."""
-    prompt = f'{NUTRITION_LOOKUP_PROMPT}\n\nFood: "{food_name}", Amount: {quantity_g}g'
+async def lookup_food_nutrition(food_name: str, quantity: float, unit: str = "g") -> dict:
+    """Use AI to estimate nutrition for a named food at given quantity and unit."""
+    prompt = (
+        f'Give me the nutritional values for {quantity}{unit} of "{food_name}".\n'
+        f'Return ONLY a JSON object, no markdown, no explanation:\n'
+        f'{{"calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "fiber_g": 0}}\n'
+        f'Use standard nutritional data (USDA or similar). Numbers rounded to 1 decimal.'
+    )
 
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip() or (settings.OPENROUTER_API_KEY or "")
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip() or (settings.GEMINI_API_KEY or "")

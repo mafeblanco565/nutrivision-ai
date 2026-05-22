@@ -45,11 +45,11 @@ export const mealService = {
     return data;
   },
 
-  async lookupFood(foodName: string, quantityG: number): Promise<{
-    food_name: string; quantity_g: number; calories: number;
+  async lookupFood(foodName: string, quantity: number, unit: string): Promise<{
+    food_name: string; quantity: number; unit: string; calories: number;
     protein_g: number; carbs_g: number; fat_g: number; fiber_g: number;
   }> {
-    const { data } = await apiClient.post("/meals/lookup-food", { food_name: foodName, quantity_g: quantityG });
+    const { data } = await apiClient.post("/meals/lookup-food", { food_name: foodName, quantity, unit });
     return data;
   },
 

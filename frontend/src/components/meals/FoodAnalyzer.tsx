@@ -111,7 +111,7 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
   const [editQty, setEditQty] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newFood, setNewFood] = useState({
-    food_name: "", quantity_g: "100", calories: "", protein_g: "", carbs_g: "", fat_g: "",
+    food_name: "", quantity: "100", unit: "g", calories: "", protein_g: "", carbs_g: "", fat_g: "",
   });
 
   const analyzeOnly = useAnalyzeOnly();
@@ -201,8 +201,10 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
     setDraftItems((prev) => prev.filter((i) => i._key !== key));
   };
 
+  const UNITS = ["g", "ml", "unidad", "taza", "porción"];
+
   const handleAddManual = () => {
-    const qty = parseFloat(newFood.quantity_g) || 100;
+    const qty = parseFloat(newFood.quantity) || 100;
     const cal = parseFloat(newFood.calories) || 0;
     const pro = parseFloat(newFood.protein_g) || 0;
     const carb = parseFloat(newFood.carbs_g) || 0;
@@ -210,12 +212,17 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
 
     if (!newFood.food_name.trim()) return;
 
+    // Display name includes unit if not grams
+    const displayName = newFood.unit === "g"
+      ? newFood.food_name.trim()
+      : `${newFood.food_name.trim()} (${qty}${newFood.unit})`;
+
     const item = makeDraftItem(
-      { food_name: newFood.food_name.trim(), quantity_g: qty, calories: cal, protein_g: pro, carbs_g: carb, fat_g: fat, fiber_g: 0, confidence: 0, is_manual: true },
+      { food_name: displayName, quantity_g: qty, calories: cal, protein_g: pro, carbs_g: carb, fat_g: fat, fiber_g: 0, confidence: 0, is_manual: true },
       `${uid}-manual-${Date.now()}`
     );
     setDraftItems((prev) => [...prev, item]);
-    setNewFood({ food_name: "", quantity_g: "100", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+    setNewFood({ food_name: "", quantity: "100", unit: "g", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
     setShowAddForm(false);
   };
 
@@ -487,25 +494,32 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
                 <div className="rounded-xl border-2 border-dashed border-primary/40 p-4 space-y-3">
                   <p className="text-sm font-medium">Agregar alimento</p>
 
-                  {/* Name + grams row */}
+                  {/* Name row */}
+                  <Input
+                    placeholder="Nombre del alimento *"
+                    value={newFood.food_name}
+                    onChange={(e) => setNewFood((f) => ({ ...f, food_name: e.target.value }))}
+                    className="text-sm"
+                    autoFocus
+                  />
+
+                  {/* Quantity + unit row */}
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Nombre del alimento *"
-                      value={newFood.food_name}
-                      onChange={(e) => setNewFood((f) => ({ ...f, food_name: e.target.value }))}
+                      type="number"
+                      placeholder="100"
+                      value={newFood.quantity}
+                      onChange={(e) => setNewFood((f) => ({ ...f, quantity: e.target.value }))}
                       className="text-sm flex-1"
+                      min={1}
                     />
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Input
-                        type="number"
-                        placeholder="100"
-                        value={newFood.quantity_g}
-                        onChange={(e) => setNewFood((f) => ({ ...f, quantity_g: e.target.value }))}
-                        className="text-sm w-20"
-                        min={1}
-                      />
-                      <span className="text-xs text-muted-foreground">g</span>
-                    </div>
+                    <select
+                      value={newFood.unit}
+                      onChange={(e) => setNewFood((f) => ({ ...f, unit: e.target.value }))}
+                      className="text-sm border border-border rounded-xl px-2 py-2 bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
                   </div>
 
                   {/* AI calculate button */}
@@ -515,17 +529,22 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
                     className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
                     disabled={!newFood.food_name.trim() || lookupFood.isPending}
                     onClick={async () => {
-                      const result = await lookupFood.mutateAsync({
-                        foodName: newFood.food_name.trim(),
-                        quantityG: parseFloat(newFood.quantity_g) || 100,
-                      });
-                      setNewFood((f) => ({
-                        ...f,
-                        calories: String(result.calories),
-                        protein_g: String(result.protein_g),
-                        carbs_g: String(result.carbs_g),
-                        fat_g: String(result.fat_g),
-                      }));
+                      try {
+                        const result = await lookupFood.mutateAsync({
+                          foodName: newFood.food_name.trim(),
+                          quantity: parseFloat(newFood.quantity) || 100,
+                          unit: newFood.unit,
+                        });
+                        setNewFood((f) => ({
+                          ...f,
+                          calories: String(result.calories),
+                          protein_g: String(result.protein_g),
+                          carbs_g: String(result.carbs_g),
+                          fat_g: String(result.fat_g),
+                        }));
+                      } catch {
+                        // silently ignore — user can fill manually
+                      }
                     }}
                   >
                     {lookupFood.isPending
@@ -557,7 +576,7 @@ export function FoodAnalyzer({ onClose, onSaved, initialDate }: FoodAnalyzerProp
                   )}
 
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setShowAddForm(false); setNewFood({ food_name: "", quantity_g: "100", calories: "", protein_g: "", carbs_g: "", fat_g: "" }); }} className="flex-1">
+                    <Button variant="outline" size="sm" onClick={() => { setShowAddForm(false); setNewFood({ food_name: "", quantity: "100", unit: "g", calories: "", protein_g: "", carbs_g: "", fat_g: "" }); }} className="flex-1">
                       Cancelar
                     </Button>
                     <Button size="sm" onClick={handleAddManual} disabled={!newFood.food_name.trim()} className="flex-1">

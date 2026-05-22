@@ -112,6 +112,7 @@ export interface AIAnalysisResponse {
 export interface FoodItemDraft {
   food_name: string;
   quantity_g: number;
+  unit?: string;
   calories: number;
   protein_g: number;
   carbs_g: number;

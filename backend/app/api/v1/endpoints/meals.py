@@ -111,12 +111,14 @@ async def analyze_meal_image(
 
 class FoodLookupRequest(BaseModel):
     food_name: str
-    quantity_g: float = 100.0
+    quantity: float = 100.0
+    unit: str = "g"   # g | ml | unidad | taza | porción
 
 
 class FoodLookupResponse(BaseModel):
     food_name: str
-    quantity_g: float
+    quantity: float
+    unit: str
     calories: float
     protein_g: float
     carbs_g: float
@@ -129,11 +131,12 @@ async def lookup_food(
     payload: FoodLookupRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Ask AI for nutritional values of a food by name and grams."""
-    result = await lookup_food_nutrition(payload.food_name, payload.quantity_g)
+    """Ask AI for nutritional values of a food by name, quantity and unit."""
+    result = await lookup_food_nutrition(payload.food_name, payload.quantity, payload.unit)
     return FoodLookupResponse(
         food_name=payload.food_name,
-        quantity_g=payload.quantity_g,
+        quantity=payload.quantity,
+        unit=payload.unit,
         calories=result.get("calories", 0),
         protein_g=result.get("protein_g", 0),
         carbs_g=result.get("carbs_g", 0),
@@ -250,7 +253,9 @@ async def create_meal(
     await daily_repo.upsert_daily(current_user.id, payload.eaten_at, db)
 
     await db.commit()
-    return meal_entry
+    # Re-fetch with items eagerly loaded (db.refresh doesn't load relationships in async)
+    repo = MealRepository(db)
+    return await repo.get_with_items(meal_entry.id, current_user.id)
 
 
 @router.post("/{meal_id}/items", response_model=MealEntryResponse)
@@ -286,8 +291,7 @@ async def add_meal_item(
     daily_repo = DailyMacrosRepository(db)
     await daily_repo.upsert_daily(current_user.id, meal.eaten_at, db)
     await db.commit()
-    await db.refresh(meal)
-    return meal
+    return await repo.get_with_items(meal_id, current_user.id)
 
 
 @router.patch("/{meal_id}", response_model=MealEntryResponse)
