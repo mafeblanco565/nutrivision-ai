@@ -122,9 +122,9 @@ class OpenRouterVisionProvider(VisionProvider):
 
     API_URL = "https://openrouter.ai/api/v1/chat/completions"
     MODELS = [
-        "nvidia/nemotron-nano-12b-v2-vl:free",
-        "google/gemma-4-31b-it:free",
-        "google/gemma-4-26b-a4b-it:free",
+        "google/gemini-2.0-flash-001",
+        "google/gemini-flash-1.5",
+        "meta-llama/llama-3.2-11b-vision-instruct",
     ]
 
     def __init__(self, api_key: str):
