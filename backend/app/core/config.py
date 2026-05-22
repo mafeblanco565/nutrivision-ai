@@ -7,7 +7,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "NutriVision AI"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.0.1"
     APP_ENV: str = "development"
     DEBUG: bool = True
     SECRET_KEY: str
