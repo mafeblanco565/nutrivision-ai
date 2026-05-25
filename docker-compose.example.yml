@@ -1,4 +1,4 @@
-﻿services:
+services:
   # ============================================================
   # PostgreSQL Database
   # ============================================================
@@ -8,7 +8,7 @@
     restart: unless-stopped
     environment:
       POSTGRES_USER: nutrivision
-      POSTGRES_PASSWORD: nutrivision_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: nutrivision_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -42,12 +42,12 @@
     environment:
       APP_ENV: production
       DEBUG: "false"
-      DATABASE_URL: postgresql+asyncpg://nutrivision:nutrivision_pass@postgres:5432/nutrivision_db
-      DATABASE_URL_SYNC: postgresql://nutrivision:nutrivision_pass@postgres:5432/nutrivision_db
-      SECRET_KEY: ${SECRET_KEY:-nutrivision-secret-key-change-in-production}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-nutrivision-jwt-secret-change-in-production}
+      DATABASE_URL: postgresql+asyncpg://nutrivision:${POSTGRES_PASSWORD}@postgres:5432/nutrivision_db
+      DATABASE_URL_SYNC: postgresql://nutrivision:${POSTGRES_PASSWORD}@postgres:5432/nutrivision_db
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       ALLOWED_ORIGINS: "http://localhost:3000"
-      LOGMEAL_API_TOKEN: ${LOGMEAL_API_TOKEN:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
@@ -83,3 +83,14 @@ volumes:
 networks:
   default:
     name: nutrivision_network
+
+# ============================================================
+# Setup instructions:
+#   1. Copy this file: cp docker-compose.example.yml docker-compose.yml
+#   2. Create a .env file with your actual values:
+#        POSTGRES_PASSWORD=your_strong_password
+#        SECRET_KEY=your_secret_key
+#        JWT_SECRET_KEY=your_jwt_secret
+#        OPENROUTER_API_KEY=your_openrouter_key
+#   3. Run: docker compose up -d
+# ============================================================

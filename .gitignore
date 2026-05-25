@@ -58,3 +58,9 @@ desktop.ini
 
 # Docker local config (has DNS settings, not needed in repo)
 docker-daemon-config.json
+
+# Docker Compose files (contain local credentials — use docker-compose.example.yml as reference)
+docker-compose.yml
+docker-compose.dev.yml
+docker-compose.local.yml
+!docker-compose.example.yml
